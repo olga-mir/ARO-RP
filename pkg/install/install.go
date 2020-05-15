@@ -198,6 +198,7 @@ func (i *Installer) Install(ctx context.Context, installConfig *installconfig.In
 			action(i.updateRouterIP),
 			action(i.configureIngressCertificate),
 			condition{i.ingressControllerReady, 30 * time.Minute},
+			action(i.installAroOperator),
 			action(i.finishInstallation),
 		},
 	}
