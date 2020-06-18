@@ -14,7 +14,7 @@ import (
 )
 
 var _ = Describe("Update clusters", func() {
-	It("should be possible to set the tag on a cluster via PUT", func() {
+	Specify("should be possible to set the tag on a cluster via PUT", func() {
 		// az resource tag --tags key=value --ids /subscriptions/xxx/resourceGroups/xxx/providers/Microsoft.RedHatOpenShift/openShiftClusters/xxx
 
 		ctx := context.Background()
