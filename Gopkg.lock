@@ -939,7 +939,7 @@
 
 [[projects]]
   branch = "release-4.3"
-  digest = "1:6de9ac34b49d1d87c4280a12daa6f79da832067e9d72ccefca3f213bbbe472c2"
+  digest = "1:3d256adb01369bef5910fc44232faea7adf7e04617c614c2fe82a59506509fcd"
   name = "github.com/openshift/client-go"
   packages = [
     "config/clientset/versioned",
@@ -954,6 +954,8 @@
     "operator/clientset/versioned/typed/operator/v1/fake",
     "operator/clientset/versioned/typed/operator/v1alpha1",
     "operator/clientset/versioned/typed/operator/v1alpha1/fake",
+    "project/clientset/versioned/scheme",
+    "project/clientset/versioned/typed/project/v1",
     "security/clientset/versioned",
     "security/clientset/versioned/scheme",
     "security/clientset/versioned/typed/security/v1",
@@ -2025,6 +2027,7 @@
     "github.com/openshift/client-go/config/clientset/versioned/scheme",
     "github.com/openshift/client-go/operator/clientset/versioned",
     "github.com/openshift/client-go/operator/clientset/versioned/fake",
+    "github.com/openshift/client-go/project/clientset/versioned/typed/project/v1",
     "github.com/openshift/client-go/security/clientset/versioned",
     "github.com/openshift/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1",
     "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1",
@@ -2074,7 +2077,6 @@
     "golang.org/x/tools/go/ast/astutil",
     "golang.org/x/tools/go/packages",
     "k8s.io/api/apps/v1",
-    "k8s.io/api/authorization/v1",
     "k8s.io/api/core/v1",
     "k8s.io/api/rbac/v1",
     "k8s.io/apimachinery/pkg/api/errors",
