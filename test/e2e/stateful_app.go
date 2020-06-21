@@ -10,9 +10,10 @@ import (
 var _ = Describe("Stateful app", func() {
 	FSpecify("should create and validate test apps", func() {
 
-		project.CreateProject("e2e-test")
+		err := project.CreateProject(projectV1, "e2e-test")
+		Expect(err).NotTo(HaveOccurred())
+
 		// list, err := clients.Kubernetes.CoreV1().Nodes().List(metav1.ListOptions{})
-		// Expect(err).NotTo(HaveOccurred())
 
 		// ctx := context.Background()
 		// By("creating test app")

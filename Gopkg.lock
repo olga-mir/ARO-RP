@@ -208,6 +208,14 @@
   version = "v1.0.1"
 
 [[projects]]
+  digest = "1:91e904d606ad35df7b5b8549d4118594bafbf492ef98b23f6ce6ed71fc64775c"
+  name = "github.com/blang/semver"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "af3461a9cbcf1f3f5889d21b83f5ef63880c33a8"
+  version = "v4.0.0"
+
+[[projects]]
   digest = "1:4e648ec283351e1036443ba736420113de2050fa7af7b34041f2555ef047a221"
   name = "github.com/containers/image"
   packages = [
@@ -1166,6 +1174,31 @@
   revision = "25bb6aeb58135c38a667e849edf5244871be4992"
 
 [[projects]]
+  digest = "1:a0f8982b262051cc0c9a34e7e4c16afffe1d31b39330c4b66e395febceded9eb"
+  name = "github.com/operator-framework/api"
+  packages = [
+    "pkg/lib/version",
+    "pkg/operators",
+    "pkg/operators/v1",
+    "pkg/operators/v1alpha1",
+    "pkg/operators/v2alpha1",
+  ]
+  pruneopts = "UT"
+  revision = "6468209c61b24bed76ed4701eba1a8b7f81b2377"
+  version = "v0.3.7"
+
+[[projects]]
+  digest = "1:d21d1475cc59ba2d70bc0c488a9fe663eaa5bedf5a747e6aaa4da0877748f1c0"
+  name = "github.com/operator-framework/operator-lifecycle-manager"
+  packages = [
+    "pkg/api/client/clientset/versioned/scheme",
+    "pkg/api/client/clientset/versioned/typed/operators/v1",
+  ]
+  pruneopts = "UT"
+  revision = "408ca95d458fff849e2d218a11cae32ce00eb08f"
+  version = "0.15.1"
+
+[[projects]]
   digest = "1:c7d8ecc4e8f2843096c784e55a221446cb944b9e728fb42e9272a9ad2996c780"
   name = "github.com/pascaldekloe/name"
   packages = ["."]
@@ -1870,6 +1903,8 @@
     "tools/clientcmd/api/latest",
     "tools/clientcmd/api/v1",
     "tools/metrics",
+    "tools/record",
+    "tools/record/util",
     "tools/reference",
     "transport",
     "util/cert",
@@ -2063,6 +2098,7 @@
     "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1",
     "github.com/openshift/machine-config-operator/pkg/generated/clientset/versioned",
     "github.com/openshift/machine-config-operator/pkg/generated/clientset/versioned/fake",
+    "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/typed/operators/v1",
     "github.com/prometheus/common/model",
     "github.com/satori/go.uuid",
     "github.com/shurcooL/vfsgen",
