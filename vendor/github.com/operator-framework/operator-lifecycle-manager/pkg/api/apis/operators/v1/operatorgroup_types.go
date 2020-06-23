@@ -1,7 +1,6 @@
 package v1
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 
@@ -16,9 +15,6 @@ const (
 	OperatorGroupProvidedAPIsAnnotationKey = "olm.providedAPIs"
 
 	OperatorGroupKind = "OperatorGroup"
-
-	OperatorGroupLabelPrefix   = "olm.operatorgroup.uid/"
-	OperatorGroupLabelTemplate = OperatorGroupLabelPrefix + "%s"
 )
 
 // OperatorGroupSpec is the spec for an OperatorGroup resource.
@@ -30,7 +26,6 @@ type OperatorGroupSpec struct {
 	// TargetNamespaces is an explicit set of namespaces to target.
 	// If it is set, Selector is ignored.
 	// +optional
-	// +listType=set
 	TargetNamespaces []string `json:"targetNamespaces,omitempty"`
 
 	// ServiceAccountName is the admin specified service account which will be
@@ -45,7 +40,6 @@ type OperatorGroupSpec struct {
 // OperatorGroupStatus is the status for an OperatorGroupResource.
 type OperatorGroupStatus struct {
 	// Namespaces is the set of target namespaces for the OperatorGroup.
-	// +listType=set
 	Namespaces []string `json:"namespaces,omitempty"`
 
 	// ServiceAccountRef references the service account object specified.
@@ -57,9 +51,6 @@ type OperatorGroupStatus struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +genclient
-// +kubebuilder:storageversion
-// +kubebuilder:resource:shortName=og,categories=olm
-// +kubebuilder:subresource:status
 
 // OperatorGroup is the unit of multitenancy for OLM managed operators.
 // It constrains the installation of operators in its namespace to a specified set of target namespaces.
@@ -78,11 +69,10 @@ type OperatorGroup struct {
 type OperatorGroupList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
-	// +listType=set
+
 	Items []OperatorGroup `json:"items"`
 }
 
-// BuildTargetNamespaces returns the set of target namespaces as a sorted, comma-delimited string
 func (o *OperatorGroup) BuildTargetNamespaces() string {
 	ns := make([]string, len(o.Status.Namespaces))
 	copy(ns, o.Status.Namespaces)
@@ -106,41 +96,4 @@ func (o *OperatorGroup) HasServiceAccountSynced() bool {
 	}
 
 	return false
-}
-
-// OGLabelKeyAndValue returns a key and value that should be applied to namespaces listed in the OperatorGroup.
-// If the UID is not set an error is returned.
-func (o *OperatorGroup) OGLabelKeyAndValue() (string, string, error) {
-	if string(o.GetUID()) == "" {
-		return "", "", fmt.Errorf("Missing UID")
-	}
-	return fmt.Sprintf(OperatorGroupLabelTemplate, o.GetUID()), "", nil
-}
-
-// NamespaceLabelSelector provides a selector that can be used to filter namespaces that belong to the OperatorGroup.
-func (o *OperatorGroup) NamespaceLabelSelector() (*metav1.LabelSelector, error) {
-	if len(o.Spec.TargetNamespaces) == 0 {
-		// If no target namespaces are set, check if a selector exists.
-		if o.Spec.Selector != nil {
-			return o.Spec.Selector, nil
-		}
-		// No selector exists, return nil which should be used to select EVERYTHING.
-		return nil, nil
-	}
-	// Return a label that should be present on all namespaces defined in the OperatorGroup.Spec.TargetNamespaces field.
-	ogKey, ogValue, err := o.OGLabelKeyAndValue()
-	if err != nil {
-		return nil, err
-	}
-
-	return &metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			ogKey: ogValue,
-		},
-	}, nil
-}
-
-// IsOperatorGroupLabel returns true if the label is an OperatorGroup label.
-func IsOperatorGroupLabel(label string) bool {
-	return strings.HasPrefix(label, OperatorGroupLabelPrefix)
 }

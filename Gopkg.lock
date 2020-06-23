@@ -1174,29 +1174,33 @@
   revision = "25bb6aeb58135c38a667e849edf5244871be4992"
 
 [[projects]]
-  digest = "1:a0f8982b262051cc0c9a34e7e4c16afffe1d31b39330c4b66e395febceded9eb"
+  digest = "1:7fe665460a9f42cf6e5add689a0c4e1af234152a1a654dda9270904944574aa2"
   name = "github.com/operator-framework/api"
   packages = [
     "pkg/lib/version",
     "pkg/operators",
-    "pkg/operators/v1",
     "pkg/operators/v1alpha1",
-    "pkg/operators/v2alpha1",
   ]
   pruneopts = "UT"
   revision = "6468209c61b24bed76ed4701eba1a8b7f81b2377"
   version = "v0.3.7"
 
 [[projects]]
-  digest = "1:d21d1475cc59ba2d70bc0c488a9fe663eaa5bedf5a747e6aaa4da0877748f1c0"
+  branch = "release-4.3"
+  digest = "1:0ecb305d8d473e6e7e43430ba1a0d078179e2dde8bd37067573cbccd7e0988eb"
   name = "github.com/operator-framework/operator-lifecycle-manager"
   packages = [
+    "pkg/api/apis/operators",
+    "pkg/api/apis/operators/v1",
+    "pkg/api/apis/operators/v1alpha1",
+    "pkg/api/client/clientset/versioned",
     "pkg/api/client/clientset/versioned/scheme",
     "pkg/api/client/clientset/versioned/typed/operators/v1",
+    "pkg/api/client/clientset/versioned/typed/operators/v1alpha1",
+    "pkg/lib/version",
   ]
   pruneopts = "UT"
-  revision = "408ca95d458fff849e2d218a11cae32ce00eb08f"
-  version = "0.15.1"
+  revision = "53643aef8322c54e87f69f23e32ff63f0f02b7fd"
 
 [[projects]]
   digest = "1:c7d8ecc4e8f2843096c784e55a221446cb944b9e728fb42e9272a9ad2996c780"
@@ -2098,7 +2102,8 @@
     "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1",
     "github.com/openshift/machine-config-operator/pkg/generated/clientset/versioned",
     "github.com/openshift/machine-config-operator/pkg/generated/clientset/versioned/fake",
-    "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/typed/operators/v1",
+    "github.com/operator-framework/api/pkg/operators/v1alpha1",
+    "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned",
     "github.com/prometheus/common/model",
     "github.com/satori/go.uuid",
     "github.com/shurcooL/vfsgen",
