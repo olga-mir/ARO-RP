@@ -4,10 +4,13 @@ import (
 
 	// authorizationv1 "k8s.io/api/authorization/v1"
 
+	"time"
+
 	projectv1 "github.com/openshift/api/project/v1"
 	projectv1client "github.com/openshift/client-go/project/clientset/versioned/typed/project/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	// "k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 // func (cli *Client) CreateProject(namespace string) error {
@@ -17,9 +20,9 @@ import (
 // 		},
 // 	})
 
-// CreateProject blah blah
-func CreateProject(proj projectv1client.ProjectV1Interface, name string) error {
-	_, err := proj.ProjectRequests().Create(&projectv1.ProjectRequest{
+// CreateProject creates a new project and validates it
+func CreateProject(projectV1Client projectv1client.ProjectV1Interface, name string) error {
+	_, err := projectV1Client.Projects().Create(&projectv1.Project{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -78,17 +81,18 @@ func CreateProject(proj projectv1client.ProjectV1Interface, name string) error {
 	return nil
 }
 
-// func CleanupProject(namespace string) error {
-// 	err := cli.ProjectV1.Projects().Delete(namespace, &metav1.DeleteOptions{})
-// 	if err != nil {
-// 		return err
-// 	}
-//
-// 	return wait.PollImmediate(2*time.Second, 10*time.Minute, func() (bool, error) {
-// 		_, err := cli.ProjectV1.Projects().Get(namespace, metav1.GetOptions{})
-// 		if errors.IsNotFound(err) || errors.IsForbidden(err) {
-// 			return true, nil
-// 		}
-// 		return false, err
-// 	})
-// }
+// CleanupProject deletes a project and validates its deletion
+func CleanupProject(projectV1Client projectv1client.ProjectV1Interface, name string) error {
+	err := projectV1Client.Projects().Delete(name, &metav1.DeleteOptions{})
+	if err != nil {
+		return err
+	}
+
+	return wait.PollImmediate(2*time.Second, 10*time.Minute, func() (bool, error) {
+		_, err := projectV1Client.Projects().Get(name, metav1.GetOptions{})
+		if errors.IsNotFound(err) || errors.IsForbidden(err) {
+			return true, nil
+		}
+		return false, err
+	})
+}

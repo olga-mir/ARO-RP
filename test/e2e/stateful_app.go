@@ -9,25 +9,29 @@ import (
 	"github.com/Azure/ARO-RP/test/util/project"
 )
 
+const (
+	packageName   = "busybox"
+	channelName   = "alpha"
+	subName       = "test-subscription"
+	secretName    = "mysecret"
+	configmapName = "special-config"
+	testNamespace = "test-e2e"
+	sourceName    = "argocd-catalog"
+	imageName     = "quay.io/jmckind/argocd-operator-registry@sha256:45f9b0ad3722cd45125347e4e9d149728200221341583a998158d1b5b4761756"
+)
+
+var _ = BeforeEach(func() {
+	err := project.CreateProject(clients.Project, testNamespace)
+	Expect(err).NotTo(HaveOccurred(), "failed to create test namespace")
+})
+
+var _ = AfterEach(func() {
+	err := project.CleanupProject(clients.Project, testNamespace)
+	Expect(err).NotTo(HaveOccurred(), "failed to delete test namespace")
+})
+
 var _ = Describe("Stateful app", func() {
 	FSpecify("should create and validate test apps", func() {
-
-		const (
-			packageName   = "busybox"
-			channelName   = "alpha"
-			subName       = "test-subscription"
-			secretName    = "mysecret"
-			configmapName = "special-config"
-			testNamespace = "test-e2e"
-		)
-
-		const (
-			sourceName = "test-catalog"
-			imageName  = "quay.io/olmtest/single-bundle-index:objects"
-		)
-
-		err := project.CreateProject(projectV1, testNamespace)
-		// Expect(err).NotTo(HaveOccurred(), "failed to create a test namespace")
 
 		// create catalog source
 		source := &v1alpha1.CatalogSource{
@@ -46,7 +50,7 @@ var _ = Describe("Stateful app", func() {
 			},
 		}
 
-		source, err = operatorClient.OperatorsV1alpha1().CatalogSources(source.GetNamespace()).Create(source)
+		source, err := clients.OLMClient.OperatorsV1alpha1().CatalogSources(source.GetNamespace()).Create(source)
 		Expect(err).ToNot(HaveOccurred(), "could not create catalog source")
 
 		// Create a Subscription for package
@@ -59,10 +63,6 @@ var _ = Describe("Stateful app", func() {
 		// }).Should(BeNil())
 
 		// confirm extra bundle objects (secret and configmap) are installed
-		Eventually(func() error {
-			_, err := clients.Kubernetes.CoreV1().Secrets(testNamespace).Get(secretName, metav1.GetOptions{}) //.GetSecret(testNamespace, secretName)
-			return err
-		}).Should(Succeed(), "expected no error getting secret object associated with CSV")
 
 		// Eventually(func() error {
 		// 	_, err := kubeClient.GetConfigMap(testNamespace, configmapName)

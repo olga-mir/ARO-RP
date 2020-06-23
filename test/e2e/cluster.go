@@ -24,15 +24,14 @@ var _ = Describe("Cluster smoke test", func() {
 
 		for _, node := range list.Items {
 			kind := strings.Split(node.Name, "-")[0]
-			l, ok := labels[kind]
+			_, ok := labels[kind]
 			Expect(ok).To(Equal(false))
 
-			for k, v := range l {
-				log.Errorf("GGGG %s; %s\n", k, v)
-				// if val, ok := node.Labels[k]; !ok || val != v {
-				// 	return log.Errorf("map does not have key %s", kind)
-				// }
-			}
+			// for k, v := range l {
+			// 	// if val, ok := node.Labels[k]; !ok || val != v {
+			// 	// 	return log.Errorf("map does not have key %s", kind)
+			// 	// }
+			// }
 		}
 	})
 })

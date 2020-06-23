@@ -26,13 +26,13 @@ type clientSet struct {
 	Operations        redhatopenshift.OperationsClient
 	Kubernetes        kubernetes.Interface
 	MachineAPI        machineapiclient.Interface
+	Project           projectv1client.ProjectV1Interface
+	OLMClient         versioned.Interface
 }
 
 var (
-	log            *logrus.Entry
-	clients        *clientSet
-	projectV1      projectv1client.ProjectV1Interface
-	operatorClient versioned.Interface
+	log     *logrus.Entry
+	clients *clientSet
 )
 
 func newClientSet() (*clientSet, error) {
@@ -53,14 +53,14 @@ func newClientSet() (*clientSet, error) {
 
 	cli := kubernetes.NewForConfigOrDie(restConfig)
 	machineapicli := machineapiclient.NewForConfigOrDie(restConfig)
-	projectV1 = projectv1client.NewForConfigOrDie(restConfig)
-	operatorClient = versioned.NewForConfigOrDie(restConfig)
 
 	return &clientSet{
 		OpenshiftClusters: redhatopenshift.NewOpenShiftClustersClient(os.Getenv("AZURE_SUBSCRIPTION_ID"), authorizer),
 		Operations:        redhatopenshift.NewOperationsClient(os.Getenv("AZURE_SUBSCRIPTION_ID"), authorizer),
 		Kubernetes:        cli,
 		MachineAPI:        machineapicli,
+		Project:           projectv1client.NewForConfigOrDie(restConfig),
+		OLMClient:         versioned.NewForConfigOrDie(restConfig),
 	}, nil
 }
 
