@@ -13,13 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-// func (cli *Client) CreateProject(namespace string) error {
-// 	_, err := cli.ProjectV1.ProjectRequests().Create(&projectv1.ProjectRequest{
-// 		ObjectMeta: metav1.ObjectMeta{
-// 			Name: namespace,
-// 		},
-// 	})
-
 // CreateProject creates a new project and validates it
 func CreateProject(projectV1Client projectv1client.ProjectV1Interface, name string) error {
 	_, err := projectV1Client.Projects().Create(&projectv1.Project{
