@@ -26,11 +26,11 @@ var _ = Describe("Stateful app", func() {
 	FSpecify("should create and validate test apps", func() {
 		testApp := NewTestApp(
 			testNamespace,
-			"argocd-operator",
-			"argocd-catalog",
-			"argocd-operator",
-			"alpha",
-			"quay.io/jmckind/argocd-operator-registry@sha256:45f9b0ad3722cd45125347e4e9d149728200221341583a998158d1b5b4761756",
+			"etcd",
+			"community-operators",
+			"etcd",
+			"singlenamespace-alpha",
+			"quay.io/coreos/etcd-operator@sha256:66a37fd61a06a43969854ee6d3e21087a98b93838e284a6086b13917f96b0d9b",
 		)
 
 		// Deploy deploys the app via operator mechanism

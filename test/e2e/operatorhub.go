@@ -15,8 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-const pollInterval = 1 * time.Second
-const pollDuration = 2 * time.Minute
+const pollInterval = 10 * time.Second
+const pollDuration = 1 * time.Minute
 
 // TestApp provides all necessary information to install a namespaced app from
 // an operator and preconfigured clients to communicate with the cluster
@@ -45,17 +45,8 @@ func NewTestApp(ns, operatorName, catalogSourceName, subscriptionName, channelNa
 // It blocks and validates that every step is finished successfully
 // This function exists if it encounters an error
 func (app *TestApp) Deploy() {
-	// Deploy CatalogSource and validate it is created successfully
-	catalogSource, err := app.createCatalogSource()
-	Expect(err).ToNot(HaveOccurred(), "failed to create catalog source")
-
-	Eventually(func() error {
-		_, err = app.fetchCatalogSource()
-		return err
-	}).Should(BeNil(), "CatalogSource not found")
-
 	// Deploy OperatorGroup and validate it is created successfully
-	_, err = app.createOperatorGroup(catalogSource)
+	_, err := app.createOperatorGroup()
 	Expect(err).ToNot(HaveOccurred(), "Failed to create operator group")
 
 	Eventually(func() error {
@@ -64,7 +55,7 @@ func (app *TestApp) Deploy() {
 	}).Should(BeNil(), "OperatorGroup not found")
 
 	// Deploy Subscription and validate it is created successfully
-	_, err = app.createSubscriptionForCatalog(catalogSource)
+	_, err = app.createSubscriptionForCatalog()
 	Expect(err).ToNot(HaveOccurred(), "Failed to create subscription")
 
 	Eventually(func() error {
@@ -79,29 +70,7 @@ func (app *TestApp) Deploy() {
 	}).Should(BeNil(), "InstallPlan not found")
 }
 
-func (app *TestApp) createCatalogSource() (*v1alpha1.CatalogSource, error) {
-	catalogSource := &v1alpha1.CatalogSource{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       v1alpha1.CatalogSourceKind,
-			APIVersion: v1alpha1.CatalogSourceCRDAPIVersion,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      app.CatalogSourceName,
-			Namespace: app.Namespace,
-			Labels:    map[string]string{"olm.catalogSource": app.CatalogSourceName},
-		},
-		Spec: v1alpha1.CatalogSourceSpec{
-			SourceType:  v1alpha1.SourceTypeGrpc,
-			Image:       app.Image,
-			DisplayName: "Argo CD Operators",
-			Publisher:   "Argo CD Community",
-		},
-	}
-	return clients.OLMClient.OperatorsV1alpha1().CatalogSources(app.Namespace).Create(catalogSource)
-}
-
-func (app *TestApp) createOperatorGroup(catalogSource *v1alpha1.CatalogSource) (*v1.OperatorGroup, error) {
-	ns := catalogSource.GetNamespace()
+func (app *TestApp) createOperatorGroup() (*v1.OperatorGroup, error) {
 	operatorGroup := &v1.OperatorGroup{
 		TypeMeta: metav1.TypeMeta{
 			Kind: v1.OperatorGroupKind,
@@ -111,46 +80,33 @@ func (app *TestApp) createOperatorGroup(catalogSource *v1alpha1.CatalogSource) (
 		},
 		Spec: v1.OperatorGroupSpec{
 			TargetNamespaces: []string{
-				ns,
+				app.Namespace,
 			},
 		},
 	}
-
-	return clients.OLMClient.OperatorsV1().OperatorGroups(ns).Create(operatorGroup)
+	return clients.OLMClient.OperatorsV1().OperatorGroups(app.Namespace).Create(operatorGroup)
 }
 
-func (app *TestApp) createSubscriptionForCatalog(catalogSource *v1alpha1.CatalogSource) (*v1alpha1.Subscription, error) {
-	ns := catalogSource.GetNamespace()
+func (app *TestApp) createSubscriptionForCatalog() (*v1alpha1.Subscription, error) {
 	subscription := &v1alpha1.Subscription{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       v1alpha1.SubscriptionKind,
 			APIVersion: v1alpha1.SubscriptionCRDAPIVersion,
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: ns,
+			Namespace: app.Namespace,
 			Name:      app.SubscriptionName,
 		},
 		Spec: &v1alpha1.SubscriptionSpec{
-			CatalogSource:          catalogSource.GetName(),
-			CatalogSourceNamespace: ns,
-			Package:                app.SubscriptionName, // TODO need package for installplan, but can be diff name?
+			CatalogSource:          app.CatalogSourceName,
+			CatalogSourceNamespace: "openshift-marketplace",
+			Package:                app.SubscriptionName,
 			Channel:                app.ChannelName,
 			InstallPlanApproval:    v1alpha1.ApprovalAutomatic,
 		},
 	}
 
-	return clients.OLMClient.OperatorsV1alpha1().Subscriptions(ns).Create(subscription)
-}
-
-func (app *TestApp) fetchCatalogSource() (fetchedCatalogSource *v1alpha1.CatalogSource, err error) {
-	err = wait.Poll(pollInterval, pollDuration, func() (bool, error) {
-		fetchedCatalogSource, err = clients.OLMClient.OperatorsV1alpha1().CatalogSources(app.Namespace).Get(app.CatalogSourceName, metav1.GetOptions{})
-		if err != nil || fetchedCatalogSource == nil {
-			return false, err
-		}
-		return true, nil
-	})
-	return fetchedCatalogSource, nil
+	return clients.OLMClient.OperatorsV1alpha1().Subscriptions(app.Namespace).Create(subscription)
 }
 
 func (app *TestApp) fetchOperatorGroup() (fetchedOperatorGroup *v1.OperatorGroup, err error) {
