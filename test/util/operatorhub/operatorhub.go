@@ -1,16 +1,17 @@
-package e2e
+package operatorhub
 
 // Copyright (c) Microsoft Corporation.
 // Licensed under the Apache License 2.0.
 
 import (
+	"errors"
 	"time"
 
-	// . "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
 	v1 "github.com/operator-framework/operator-lifecycle-manager/pkg/api/apis/operators/v1"
 	"github.com/operator-framework/operator-lifecycle-manager/pkg/api/apis/operators/v1alpha1"
+	"github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
@@ -21,23 +22,25 @@ const pollDuration = 1 * time.Minute
 // TestApp provides all necessary information to install a namespaced app from
 // an operator and preconfigured clients to communicate with the cluster
 type TestApp struct {
-	Namespace         string
-	OperatorName      string
-	CatalogSourceName string
-	SubscriptionName  string
-	ChannelName       string
-	Image             string
+	olmclient              versioned.Interface
+	name                   string
+	namespace              string
+	catalogSourceName      string
+	catalogSourceNamespace string
+	channelName            string
+	image                  string
 }
 
 // NewTestApp constructs a new TestApp object
-func NewTestApp(ns, operatorName, catalogSourceName, subscriptionName, channelName, image string) TestApp {
+func NewTestApp(olmclient versioned.Interface, name, namespace, catalogSourceName, catalogSourceNamespace, channelName, image string) TestApp {
 	return TestApp{
-		Namespace:         ns,
-		OperatorName:      operatorName,
-		CatalogSourceName: catalogSourceName,
-		SubscriptionName:  subscriptionName,
-		ChannelName:       channelName,
-		Image:             image,
+		olmclient:              olmclient,
+		name:                   name,
+		namespace:              namespace,
+		catalogSourceName:      catalogSourceName,
+		catalogSourceNamespace: catalogSourceNamespace,
+		channelName:            channelName,
+		image:                  image,
 	}
 }
 
@@ -65,8 +68,7 @@ func (app *TestApp) Deploy() {
 
 	// When Subscription is created, InstallPlan should be created automatically
 	Eventually(func() error {
-		_, err := app.fetchInstallPlan()
-		return err
+		return app.ensureInstallPlan()
 	}).Should(BeNil(), "InstallPlan not found")
 }
 
@@ -76,15 +78,15 @@ func (app *TestApp) createOperatorGroup() (*v1.OperatorGroup, error) {
 			Kind: v1.OperatorGroupKind,
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: app.OperatorName,
+			Name: app.name,
 		},
 		Spec: v1.OperatorGroupSpec{
 			TargetNamespaces: []string{
-				app.Namespace,
+				app.namespace,
 			},
 		},
 	}
-	return clients.OLMClient.OperatorsV1().OperatorGroups(app.Namespace).Create(operatorGroup)
+	return app.olmclient.OperatorsV1().OperatorGroups(app.namespace).Create(operatorGroup)
 }
 
 func (app *TestApp) createSubscriptionForCatalog() (*v1alpha1.Subscription, error) {
@@ -94,24 +96,24 @@ func (app *TestApp) createSubscriptionForCatalog() (*v1alpha1.Subscription, erro
 			APIVersion: v1alpha1.SubscriptionCRDAPIVersion,
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: app.Namespace,
-			Name:      app.SubscriptionName,
+			Namespace: app.namespace,
+			Name:      app.name,
 		},
 		Spec: &v1alpha1.SubscriptionSpec{
-			CatalogSource:          app.CatalogSourceName,
-			CatalogSourceNamespace: "openshift-marketplace",
-			Package:                app.SubscriptionName,
-			Channel:                app.ChannelName,
+			CatalogSource:          app.catalogSourceName,
+			CatalogSourceNamespace: app.catalogSourceNamespace,
+			Package:                app.name,
+			Channel:                app.channelName,
 			InstallPlanApproval:    v1alpha1.ApprovalAutomatic,
 		},
 	}
 
-	return clients.OLMClient.OperatorsV1alpha1().Subscriptions(app.Namespace).Create(subscription)
+	return app.olmclient.OperatorsV1alpha1().Subscriptions(app.namespace).Create(subscription)
 }
 
 func (app *TestApp) fetchOperatorGroup() (fetchedOperatorGroup *v1.OperatorGroup, err error) {
 	err = wait.Poll(pollInterval, pollDuration, func() (bool, error) {
-		fetchedOperatorGroup, err = clients.OLMClient.OperatorsV1().OperatorGroups(app.Namespace).Get(app.OperatorName, metav1.GetOptions{})
+		fetchedOperatorGroup, err = app.olmclient.OperatorsV1().OperatorGroups(app.namespace).Get(app.name, metav1.GetOptions{})
 		if err != nil || fetchedOperatorGroup == nil {
 			return false, err
 		}
@@ -122,7 +124,7 @@ func (app *TestApp) fetchOperatorGroup() (fetchedOperatorGroup *v1.OperatorGroup
 
 func (app *TestApp) fetchSubscription() (fetchedSubscription *v1alpha1.Subscription, err error) {
 	err = wait.Poll(pollInterval, pollDuration, func() (bool, error) {
-		fetchedSubscription, err = clients.OLMClient.OperatorsV1alpha1().Subscriptions(app.Namespace).Get(app.SubscriptionName, metav1.GetOptions{})
+		fetchedSubscription, err = app.olmclient.OperatorsV1alpha1().Subscriptions(app.namespace).Get(app.name, metav1.GetOptions{})
 		if err != nil || fetchedSubscription == nil {
 			return false, err
 		}
@@ -131,24 +133,17 @@ func (app *TestApp) fetchSubscription() (fetchedSubscription *v1alpha1.Subscript
 	return fetchedSubscription, err
 }
 
-// fetches list of InstallPlans in the namespace and returns a first one that
-// matches provided subscription. InstallPlan has autogenerated name
-// therefore we have to fetch list and find it by the properties.
-func (app *TestApp) fetchInstallPlan() (fetchedInstallPlan *v1alpha1.InstallPlan, err error) {
-	err = wait.Poll(pollInterval, pollDuration, func() (bool, error) {
-		list, err := clients.OLMClient.OperatorsV1alpha1().InstallPlans(app.Namespace).List(metav1.ListOptions{})
-		if err != nil || list == nil || len(list.Items) == 0 {
-			return false, err
-		}
-		for _, i := range list.Items {
-			for _, r := range i.ObjectMeta.OwnerReferences {
-				if r.Kind == "Subscription" && r.Name == app.SubscriptionName {
-					fetchedInstallPlan = &i
-					return true, nil
-				}
+func (app *TestApp) ensureInstallPlan() (err error) {
+	list, err := app.olmclient.OperatorsV1alpha1().InstallPlans(app.namespace).List(metav1.ListOptions{})
+	if err != nil || list == nil || len(list.Items) == 0 {
+		return err
+	}
+	for _, i := range list.Items {
+		for _, r := range i.ObjectMeta.OwnerReferences {
+			if r.Kind == "Subscription" && r.Name == app.name {
+				return nil
 			}
 		}
-		return true, nil
-	})
-	return fetchedInstallPlan, err
+	}
+	return errors.New("InstallPlan is not found")
 }

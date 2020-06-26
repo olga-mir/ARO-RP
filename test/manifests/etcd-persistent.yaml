@@ -1,0 +1,16 @@
+apiVersion: etcd.database.coreos.com/v1beta2
+kind: EtcdCluster
+metadata:
+  name: etcd-persistent
+  namespace: test-e2e
+spec:
+  size: 3
+  version: 3.2.13
+  pod:
+    persistentVolumeClaimSpec:
+      storageClassName: managed-premium
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi

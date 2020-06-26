@@ -7,6 +7,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"github.com/Azure/ARO-RP/test/util/operatorhub"
 	"github.com/Azure/ARO-RP/test/util/project"
 )
 
@@ -24,11 +25,13 @@ var _ = AfterEach(func() {
 
 var _ = Describe("Stateful app", func() {
 	FSpecify("should create and validate test apps", func() {
-		testApp := NewTestApp(
+		testApp := operatorhub.NewTestApp(
+			clients.OLMClient,
+
+			"etcd",
 			testNamespace,
-			"etcd",
 			"community-operators",
-			"etcd",
+			"openshift-marketplace",
 			"singlenamespace-alpha",
 			"quay.io/coreos/etcd-operator@sha256:66a37fd61a06a43969854ee6d3e21087a98b93838e284a6086b13917f96b0d9b",
 		)

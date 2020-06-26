@@ -6,8 +6,10 @@ package e2e
 import (
 	"fmt"
 	"os"
+	"time"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 	//	"github.com/openshift/client-go/config/clientset/versioned"
@@ -65,6 +67,9 @@ func newClientSet() (*clientSet, error) {
 }
 
 var _ = BeforeSuite(func() {
+	SetDefaultEventuallyTimeout(1 * time.Minute)
+	SetDefaultEventuallyPollingInterval(1 * time.Second)
+
 	log.Info("BeforeSuite")
 	for _, key := range []string{
 		"AZURE_SUBSCRIPTION_ID",
