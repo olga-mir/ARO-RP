@@ -90,7 +90,7 @@ func (dv *openShiftClusterDynamicValidator) Dynamic(ctx context.Context) error {
 		return err
 	}
 
-	spAuthorizer, err := dv.validateServicePrincipalProfile(ctx)
+	spAuthorizer, err := dv.ValidateServicePrincipalProfile(ctx)
 	if err != nil {
 		return err
 	}
@@ -110,12 +110,12 @@ func (dv *openShiftClusterDynamicValidator) Dynamic(ctx context.Context) error {
 		return err
 	}
 
-	err = dv.validateVnetPermissions(ctx, spAuthorizer, dv.spPermissions, vnetID, &vnetr, api.CloudErrorCodeInvalidServicePrincipalPermissions, "provided service principal")
+	err = dv.ValidateVnetPermissions(ctx, spAuthorizer, dv.spPermissions, vnetID, &vnetr, api.CloudErrorCodeInvalidServicePrincipalPermissions, "provided service principal")
 	if err != nil {
 		return err
 	}
 
-	err = dv.validateVnetPermissions(ctx, dv.fpAuthorizer, dv.fpPermissions, vnetID, &vnetr, api.CloudErrorCodeInvalidResourceProviderPermissions, "resource provider")
+	err = dv.ValidateVnetPermissions(ctx, dv.fpAuthorizer, dv.fpPermissions, vnetID, &vnetr, api.CloudErrorCodeInvalidResourceProviderPermissions, "resource provider")
 	if err != nil {
 		return err
 	}
@@ -126,22 +126,22 @@ func (dv *openShiftClusterDynamicValidator) Dynamic(ctx context.Context) error {
 		return err
 	}
 
-	err = dv.validateRouteTablePermissions(ctx, spAuthorizer, dv.spPermissions, &vnet, api.CloudErrorCodeInvalidServicePrincipalPermissions, "provided service principal")
+	err = dv.ValidateRouteTablePermissions(ctx, spAuthorizer, dv.spPermissions, &vnet, api.CloudErrorCodeInvalidServicePrincipalPermissions, "provided service principal")
 	if err != nil {
 		return err
 	}
 
-	err = dv.validateRouteTablePermissions(ctx, dv.fpAuthorizer, dv.fpPermissions, &vnet, api.CloudErrorCodeInvalidResourceProviderPermissions, "resource provider")
+	err = dv.ValidateRouteTablePermissions(ctx, dv.fpAuthorizer, dv.fpPermissions, &vnet, api.CloudErrorCodeInvalidResourceProviderPermissions, "resource provider")
 	if err != nil {
 		return err
 	}
 
-	err = dv.validateVnet(ctx, &vnet)
+	err = dv.ValidateVnet(ctx, &vnet)
 	if err != nil {
 		return err
 	}
 
-	err = dv.validateProviders(ctx)
+	err = dv.ValidateProviders(ctx)
 	if err != nil {
 		return err
 	}
@@ -156,8 +156,8 @@ func (dv *openShiftClusterDynamicValidator) Dynamic(ctx context.Context) error {
 	return nil
 }
 
-func (dv *openShiftClusterDynamicValidator) validateServicePrincipalProfile(ctx context.Context) (refreshable.Authorizer, error) {
-	dv.log.Print("validateServicePrincipalProfile")
+func (dv *openShiftClusterDynamicValidator) ValidateServicePrincipalProfile(ctx context.Context) (refreshable.Authorizer, error) {
+	dv.log.Print("ValidateServicePrincipalProfile")
 
 	token, err := aad.GetToken(ctx, dv.log, dv.oc, azure.PublicCloud.ResourceManagerEndpoint)
 	if err != nil {
@@ -180,7 +180,7 @@ func (dv *openShiftClusterDynamicValidator) validateServicePrincipalProfile(ctx 
 	return refreshable.NewAuthorizer(token), nil
 }
 
-func (dv *openShiftClusterDynamicValidator) validateVnetPermissions(ctx context.Context, authorizer refreshable.Authorizer, client authorization.PermissionsClient, vnetID string, vnetr *azure.Resource, code, typ string) error {
+func (dv *openShiftClusterDynamicValidator) ValidateVnetPermissions(ctx context.Context, authorizer refreshable.Authorizer, client authorization.PermissionsClient, vnetID string, vnetr *azure.Resource, code, typ string) error {
 	dv.log.Printf("validateVnetPermissions (%s)", typ)
 
 	err := validateActions(ctx, dv.log, vnetr, []string{
@@ -201,7 +201,7 @@ func (dv *openShiftClusterDynamicValidator) validateVnetPermissions(ctx context.
 	return err
 }
 
-func (dv *openShiftClusterDynamicValidator) validateRouteTablePermissions(ctx context.Context, authorizer refreshable.Authorizer, client authorization.PermissionsClient, vnet *mgmtnetwork.VirtualNetwork, code, typ string) error {
+func (dv *openShiftClusterDynamicValidator) ValidateRouteTablePermissions(ctx context.Context, authorizer refreshable.Authorizer, client authorization.PermissionsClient, vnet *mgmtnetwork.VirtualNetwork, code, typ string) error {
 	err := dv.validateRouteTablePermissionsSubnet(ctx, authorizer, client, vnet, dv.oc.Properties.MasterProfile.SubnetID, "properties.masterProfile.subnetId", code, typ)
 	if err != nil {
 		return err
@@ -319,7 +319,7 @@ func (dv *openShiftClusterDynamicValidator) validateSubnet(ctx context.Context, 
 }
 
 // validateVnet checks that the vnet does not have custom dns servers set
-func (dv *openShiftClusterDynamicValidator) validateVnet(ctx context.Context, vnet *mgmtnetwork.VirtualNetwork) error {
+func (dv *openShiftClusterDynamicValidator) ValidateVnet(ctx context.Context, vnet *mgmtnetwork.VirtualNetwork) error {
 	dv.log.Print("validateVnet")
 
 	master, err := dv.validateSubnet(ctx, vnet, "properties.masterProfile.subnetId", dv.oc.Properties.MasterProfile.SubnetID)
@@ -356,7 +356,7 @@ func (dv *openShiftClusterDynamicValidator) validateVnet(ctx context.Context, vn
 	return nil
 }
 
-func (dv *openShiftClusterDynamicValidator) validateProviders(ctx context.Context) error {
+func (dv *openShiftClusterDynamicValidator) ValidateProviders(ctx context.Context) error {
 	dv.log.Print("validateProviders")
 
 	providers, err := dv.spProviders.List(ctx, nil, "")
