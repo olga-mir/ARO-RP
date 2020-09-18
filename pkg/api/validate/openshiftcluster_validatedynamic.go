@@ -35,9 +35,10 @@ import (
 // OpenShiftClusterDynamicValidator is the dynamic validator interface
 type OpenShiftClusterDynamicValidator interface {
 	Dynamic(context.Context) error
+	Setup(context.Context) error
 	ValidateServicePrincipalProfile(context.Context) (refreshable.Authorizer, error)
-	ValidateVnetPermissions(context.Context, refreshable.Authorizer, authorization.PermissionsClient, string, *azure.Resource, string, string) error
-	ValidateRouteTablePermissions(context.Context, refreshable.Authorizer, authorization.PermissionsClient, *mgmtnetwork.VirtualNetwork, string, string) error
+	ValidateVnetPermissions(context.Context, string, *azure.Resource, string) error
+	ValidateRouteTablePermissions(context.Context, *mgmtnetwork.VirtualNetwork, string) error
 }
 
 // NewOpenShiftClusterDynamicValidator creates a new OpenShiftClusterDynamicValidator
@@ -74,6 +75,7 @@ type openShiftClusterDynamicValidator struct {
 	oc *api.OpenShiftCluster
 
 	fpAuthorizer refreshable.Authorizer
+	spAuthorizer refreshable.Authorizer
 
 	fpPermissions     authorization.PermissionsClient
 	spPermissions     authorization.PermissionsClient
@@ -82,26 +84,33 @@ type openShiftClusterDynamicValidator struct {
 	spVirtualNetworks network.VirtualNetworksClient
 }
 
-// Dynamic validates an OpenShift cluster
-func (dv *openShiftClusterDynamicValidator) Dynamic(ctx context.Context) error {
-	// TODO: Dynamic() should work on an enriched oc (in update), and it
-	// currently doesn't.  One sticking point is handling subnet overlap
-	// calculations.
-
+func (dv *openShiftClusterDynamicValidator) Setup(ctx context.Context) error {
 	r, err := azure.ParseResourceID(dv.oc.ID)
 	if err != nil {
 		return err
 	}
 
-	spAuthorizer, err := dv.ValidateServicePrincipalProfile(ctx)
+	dv.spAuthorizer, err = dv.ValidateServicePrincipalProfile(ctx)
 	if err != nil {
 		return err
 	}
 
-	dv.spPermissions = authorization.NewPermissionsClient(r.SubscriptionID, spAuthorizer)
-	dv.spProviders = features.NewProvidersClient(r.SubscriptionID, spAuthorizer)
-	dv.spUsage = compute.NewUsageClient(r.SubscriptionID, spAuthorizer)
-	dv.spVirtualNetworks = network.NewVirtualNetworksClient(r.SubscriptionID, spAuthorizer)
+	dv.spPermissions = authorization.NewPermissionsClient(r.SubscriptionID, dv.spAuthorizer)
+	dv.spProviders = features.NewProvidersClient(r.SubscriptionID, dv.spAuthorizer)
+	dv.spUsage = compute.NewUsageClient(r.SubscriptionID, dv.spAuthorizer)
+	dv.spVirtualNetworks = network.NewVirtualNetworksClient(r.SubscriptionID, dv.spAuthorizer)
+	return nil
+}
+
+// Dynamic validates an OpenShift cluster
+func (dv *openShiftClusterDynamicValidator) Dynamic(ctx context.Context) error {
+	// TODO: Dynamic() should work on an enriched oc (in update), and it
+	// currently doesn't.  One sticking point is handling subnet overlap
+	// calculations.
+	err := dv.Setup(ctx)
+	if err != nil {
+		return err
+	}
 
 	vnetID, _, err := subnet.Split(dv.oc.Properties.MasterProfile.SubnetID)
 	if err != nil {
@@ -113,12 +122,12 @@ func (dv *openShiftClusterDynamicValidator) Dynamic(ctx context.Context) error {
 		return err
 	}
 
-	err = dv.ValidateVnetPermissions(ctx, spAuthorizer, dv.spPermissions, vnetID, &vnetr, api.CloudErrorCodeInvalidServicePrincipalPermissions, "provided service principal")
+	err = dv.ValidateVnetPermissions(ctx, vnetID, &vnetr, "provided service principal")
 	if err != nil {
 		return err
 	}
 
-	err = dv.ValidateVnetPermissions(ctx, dv.fpAuthorizer, dv.fpPermissions, vnetID, &vnetr, api.CloudErrorCodeInvalidResourceProviderPermissions, "resource provider")
+	err = dv.ValidateVnetPermissions(ctx, vnetID, &vnetr, "resource provider")
 	if err != nil {
 		return err
 	}
@@ -129,12 +138,12 @@ func (dv *openShiftClusterDynamicValidator) Dynamic(ctx context.Context) error {
 		return err
 	}
 
-	err = dv.ValidateRouteTablePermissions(ctx, spAuthorizer, dv.spPermissions, &vnet, api.CloudErrorCodeInvalidServicePrincipalPermissions, "provided service principal")
+	err = dv.ValidateRouteTablePermissions(ctx, &vnet, "provided service principal")
 	if err != nil {
 		return err
 	}
 
-	err = dv.ValidateRouteTablePermissions(ctx, dv.fpAuthorizer, dv.fpPermissions, &vnet, api.CloudErrorCodeInvalidResourceProviderPermissions, "resource provider")
+	err = dv.ValidateRouteTablePermissions(ctx, &vnet, "resource provider")
 	if err != nil {
 		return err
 	}
@@ -183,8 +192,21 @@ func (dv *openShiftClusterDynamicValidator) ValidateServicePrincipalProfile(ctx 
 	return refreshable.NewAuthorizer(token), nil
 }
 
-func (dv *openShiftClusterDynamicValidator) ValidateVnetPermissions(ctx context.Context, authorizer refreshable.Authorizer, client authorization.PermissionsClient, vnetID string, vnetr *azure.Resource, code, typ string) error {
+func (dv *openShiftClusterDynamicValidator) ValidateVnetPermissions(ctx context.Context, vnetID string, vnetr *azure.Resource, typ string) error {
 	dv.log.Printf("validateVnetPermissions (%s)", typ)
+
+	var authorizer refreshable.Authorizer
+	var client authorization.PermissionsClient
+	var code string
+	if strings.Contains(typ, "service pricipal") {
+		authorizer = dv.spAuthorizer
+		client = dv.spPermissions
+		code = api.CloudErrorCodeInvalidServicePrincipalPermissions
+	} else if strings.Contains(typ, "resource provider") {
+		authorizer = dv.fpAuthorizer
+		client = dv.fpPermissions
+		code = api.CloudErrorCodeInvalidResourceProviderPermissions
+	}
 
 	err := validateActions(ctx, dv.log, vnetr, []string{
 		"Microsoft.Network/virtualNetworks/join/action",
@@ -204,7 +226,20 @@ func (dv *openShiftClusterDynamicValidator) ValidateVnetPermissions(ctx context.
 	return err
 }
 
-func (dv *openShiftClusterDynamicValidator) ValidateRouteTablePermissions(ctx context.Context, authorizer refreshable.Authorizer, client authorization.PermissionsClient, vnet *mgmtnetwork.VirtualNetwork, code, typ string) error {
+func (dv *openShiftClusterDynamicValidator) ValidateRouteTablePermissions(ctx context.Context, vnet *mgmtnetwork.VirtualNetwork, typ string) error {
+	var authorizer refreshable.Authorizer
+	var client authorization.PermissionsClient
+	var code string
+	if strings.Contains(typ, "service pricipal") {
+		authorizer = dv.spAuthorizer
+		client = dv.spPermissions
+		code = api.CloudErrorCodeInvalidServicePrincipalPermissions
+	} else if strings.Contains(typ, "resource provider") {
+		authorizer = dv.fpAuthorizer
+		client = dv.fpPermissions
+		code = api.CloudErrorCodeInvalidResourceProviderPermissions
+	}
+
 	err := dv.validateRouteTablePermissionsSubnet(ctx, authorizer, client, vnet, dv.oc.Properties.MasterProfile.SubnetID, "properties.masterProfile.subnetId", code, typ)
 	if err != nil {
 		return err

@@ -13,8 +13,6 @@ import (
 	"github.com/Azure/ARO-RP/pkg/api/validate"
 	"github.com/Azure/ARO-RP/pkg/env"
 	"github.com/Azure/ARO-RP/pkg/metrics"
-	"github.com/Azure/ARO-RP/pkg/util/azureclient/mgmt/authorization"
-	"github.com/Azure/ARO-RP/pkg/util/refreshable"
 	"github.com/Azure/ARO-RP/pkg/util/subnet"
 )
 
@@ -30,7 +28,7 @@ type Monitor struct {
 	m  metrics.Interface
 	dv validate.OpenShiftClusterDynamicValidator
 
-	spAuthorizer refreshable.Authorizer
+	// spAuthorizer refreshable.Authorizer
 	// fpAuthorizer refreshable.Authorizer
 	// fpPermissions     authorization.PermissionsClient
 	// spPermissions     authorization.PermissionsClient
@@ -80,21 +78,8 @@ var errorMap = map[string]string{
 	api.CloudErrorResourceProviderNotRegistered:          "rp_not_registered",
 }
 
-func (mon *Monitor) validateServicePrincipalProfile(ctx context.Context) error {
-	spAuthorizer, err := mon.dv.ValidateServicePrincipalProfile(ctx)
-	if err != nil {
-		return err
-	}
-	mon.spAuthorizer = spAuthorizer
-	return nil
-}
-
-func (mon *Monitor) v1(ctx context.Context) error {
-	spPermissions := authorization.NewPermissionsClient(mon.resource.SubscriptionID, mon.spAuthorizer)
-	// spProviders := features.NewProvidersClient(r.SubscriptionID, spAuthorizer)
-	// spUsage := compute.NewUsageClient(r.SubscriptionID, spAuthorizer)
-	// spVirtualNetworks := network.NewVirtualNetworksClient(r.SubscriptionID, spAuthorizer)
-
+func (mon *Monitor) spValidateVnetPermissions(ctx context.Context) error {
+	// TODO - vnetID and vnetr to setup as properties to avoid duplication
 	vnetID, _, err := subnet.Split(mon.oc.Properties.MasterProfile.SubnetID)
 	if err != nil {
 		return err
@@ -105,33 +90,58 @@ func (mon *Monitor) v1(ctx context.Context) error {
 		return err
 	}
 
-	return mon.dv.ValidateVnetPermissions(ctx, mon.spAuthorizer, spPermissions, vnetID, &vnetr, api.CloudErrorCodeInvalidServicePrincipalPermissions, "provided service principal")
+	return mon.dv.ValidateVnetPermissions(ctx, vnetID, &vnetr, "service principal")
 }
 
-// err = dv.ValidateVnetPermissions(ctx, dv.fpAuthorizer, dv.fpPermissions, vnetID, &vnetr, api.CloudErrorCodeInvalidResourceProviderPermissions, "resource provider")
-// func (mon *Monitor) v2(ctx context.Context) error {
-// 	return mon.dv.ValidateRouteTablePermissions(ctx, spAuthorizer, dv.spPermissions, &vnet, api.CloudErrorCodeInvalidServicePrincipalPermissions, "provided service principal")
-// }
+func (mon *Monitor) rpValidateVnetPermissions(ctx context.Context) error {
+	vnetID, _, err := subnet.Split(mon.oc.Properties.MasterProfile.SubnetID)
+	if err != nil {
+		return err
+	}
+
+	vnetr, err := azure.ParseResourceID(vnetID)
+	if err != nil {
+		return err
+	}
+
+	return mon.dv.ValidateVnetPermissions(ctx, vnetID, &vnetr, "resource provider")
+}
+
+func (mon *Monitor) spValidateRouteTablePermissions(ctx context.Context) error {
+	return nil
+	// vnet, err := dv.spVirtualNetworks.Get(ctx, vnetr.ResourceGroup, vnetr.ResourceName, "")
+	// if err != nil {
+	// 	return err
+	// }
+	// return mon.dv.ValidateRouteTablePermissions(ctx, &vnet, "service principal")
+}
 
 //        err = dv.ValidateRouteTablePermissions(ctx, dv.fpAuthorizer, dv.fpPermissions, &vnet, api.CloudErrorCodeInvalidResourceProviderPermissions, "resource provider")
 //        err = dv.ValidateVnet(ctx, &vnet)
 //        err = dv.ValidateProviders(ctx)
 
-// Monitor checks the API server health of a cluster
+// Monitor checks various misconfigurations in cloud infrastructure
 func (mon *Monitor) Monitor(ctx context.Context) {
 	mon.log.Debug("monitoring")
 
+	err := mon.dv.Setup(ctx)
+	mon.reportError(err)
+	// probably we need to split checks in rp and sp series. Abort the line if the permissions are missing?
+
 	for _, f := range []func(context.Context) error{
-		mon.validateServicePrincipalProfile, // if spAuthorizer fails, some of the checks would not make sense (==always fail)?
-		mon.v1,
-		// mon.v2,
+		mon.spValidateVnetPermissions,
+		mon.rpValidateVnetPermissions,
+		mon.spValidateRouteTablePermissions,
 	} {
-		err := f(ctx)
-		if err != nil {
-			if err, ok := err.(*api.CloudError); ok {
-				mon.log.Printf("Found cloud config error: %s", err)
-				mon.emitGauge("monitor.clouderrors", 1, map[string]string{"monitor": errorMap[err.CloudErrorBody.Code]})
-			}
+		mon.reportError(f(ctx))
+	}
+}
+
+func (mon *Monitor) reportError(err error) {
+	if err != nil {
+		if err, ok := err.(*api.CloudError); ok {
+			mon.log.Printf("Found cloud config error: %s", err)
+			mon.emitGauge("monitor.clouderrors", 1, map[string]string{"monitor": errorMap[err.CloudErrorBody.Code]})
 		}
 	}
 }
