@@ -13,6 +13,8 @@ import (
 	"github.com/Azure/ARO-RP/pkg/api/validate"
 	"github.com/Azure/ARO-RP/pkg/env"
 	"github.com/Azure/ARO-RP/pkg/metrics"
+	"github.com/Azure/ARO-RP/pkg/util/azureclient/mgmt/authorization"
+	"github.com/Azure/ARO-RP/pkg/util/subnet"
 )
 
 type Monitor struct {
@@ -66,13 +68,38 @@ func NewMonitor(ctx context.Context, env env.Interface, log *logrus.Entry, oc *a
 //       api.CloudErrorResourceProviderNotRegistered:          "rp_not_registered",
 
 func (mon *Monitor) v1(ctx context.Context) error {
-	return mon.dv.ValidateVnetPermissions(ctx, spAuthorizer, dv.spPermissions, vnetID, &vnetr, api.CloudErrorCodeInvalidServicePrincipalPermissions, "provided service principal")
+	r, err := azure.ParseResourceID(mon.oc.ID)
+	if err != nil {
+		return err
+	}
+
+	spAuthorizer, err := mon.dv.ValidateServicePrincipalProfile(ctx)
+	if err != nil {
+		return err
+	}
+
+	spPermissions := authorization.NewPermissionsClient(r.SubscriptionID, spAuthorizer)
+	// spProviders := features.NewProvidersClient(r.SubscriptionID, spAuthorizer)
+	// spUsage := compute.NewUsageClient(r.SubscriptionID, spAuthorizer)
+	// spVirtualNetworks := network.NewVirtualNetworksClient(r.SubscriptionID, spAuthorizer)
+
+	vnetID, _, err := subnet.Split(mon.oc.Properties.MasterProfile.SubnetID)
+	if err != nil {
+		return err
+	}
+
+	vnetr, err := azure.ParseResourceID(vnetID)
+	if err != nil {
+		return err
+	}
+
+	return mon.dv.ValidateVnetPermissions(ctx, spAuthorizer, spPermissions, vnetID, &vnetr, api.CloudErrorCodeInvalidServicePrincipalPermissions, "provided service principal")
 }
 
 // err = dv.ValidateVnetPermissions(ctx, dv.fpAuthorizer, dv.fpPermissions, vnetID, &vnetr, api.CloudErrorCodeInvalidResourceProviderPermissions, "resource provider")
-func (mon *Monitor) v2(ctx context.Context) error {
-	return mon.dv.ValidateRouteTablePermissions(ctx, spAuthorizer, dv.spPermissions, &vnet, api.CloudErrorCodeInvalidServicePrincipalPermissions, "provided service principal")
-}
+// func (mon *Monitor) v2(ctx context.Context) error {
+// 	return mon.dv.ValidateRouteTablePermissions(ctx, spAuthorizer, dv.spPermissions, &vnet, api.CloudErrorCodeInvalidServicePrincipalPermissions, "provided service principal")
+// }
 
 //        err = dv.ValidateRouteTablePermissions(ctx, dv.fpAuthorizer, dv.fpPermissions, &vnet, api.CloudErrorCodeInvalidResourceProviderPermissions, "resource provider")
 //        err = dv.ValidateVnet(ctx, &vnet)
@@ -84,7 +111,7 @@ func (mon *Monitor) Monitor(ctx context.Context) {
 
 	for _, f := range []func(context.Context) error{
 		mon.v1,
-		mon.v2,
+		// mon.v2,
 	} {
 		err := f(ctx)
 		if err != nil {

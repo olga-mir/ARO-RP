@@ -12,6 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/Azure/ARO-RP/pkg/api"
+	"github.com/Azure/ARO-RP/pkg/monitor/cloud"
 	"github.com/Azure/ARO-RP/pkg/monitor/cluster"
 	utillog "github.com/Azure/ARO-RP/pkg/util/log"
 	"github.com/Azure/ARO-RP/pkg/util/recover"
@@ -171,7 +172,7 @@ out:
 		// cached metrics in the remaining minutes
 
 		if sub != nil && sub.Subscription != nil && sub.Subscription.State != api.SubscriptionStateSuspended && sub.Subscription.State != api.SubscriptionStateWarned {
-			mon.workOne(context.Background(), log, v.doc, newh != h)
+			mon.workOne(context.Background(), log, v.doc, sub, newh != h)
 		}
 
 		select {
@@ -187,7 +188,7 @@ out:
 }
 
 // workOne checks the API server health of a cluster
-func (mon *monitor) workOne(ctx context.Context, log *logrus.Entry, doc *api.OpenShiftClusterDocument, hourlyRun bool) {
+func (mon *monitor) workOne(ctx context.Context, log *logrus.Entry, doc *api.OpenShiftClusterDocument, subscriptionDoc *api.SubscriptionDocument, hourlyRun bool) {
 	ctx, cancel := context.WithTimeout(ctx, 50*time.Second)
 	defer cancel()
 
@@ -198,4 +199,12 @@ func (mon *monitor) workOne(ctx context.Context, log *logrus.Entry, doc *api.Ope
 	}
 
 	c.Monitor(ctx)
+
+	cm, err := cloud.NewMonitor(ctx, mon.env, log, doc.OpenShiftCluster, subscriptionDoc, mon.clusterm, hourlyRun)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	cm.Monitor(ctx) // should be ok to run in parallel with cluster mon.
+
 }

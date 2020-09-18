@@ -35,6 +35,9 @@ import (
 // OpenShiftClusterDynamicValidator is the dynamic validator interface
 type OpenShiftClusterDynamicValidator interface {
 	Dynamic(context.Context) error
+	ValidateServicePrincipalProfile(context.Context) (refreshable.Authorizer, error)
+	ValidateVnetPermissions(context.Context, refreshable.Authorizer, authorization.PermissionsClient, string, *azure.Resource, string, string) error
+	ValidateRouteTablePermissions(context.Context, refreshable.Authorizer, authorization.PermissionsClient, *mgmtnetwork.VirtualNetwork, string, string) error
 }
 
 // NewOpenShiftClusterDynamicValidator creates a new OpenShiftClusterDynamicValidator
