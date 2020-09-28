@@ -198,7 +198,7 @@ func (dv *openShiftClusterDynamicValidator) ValidateVnetPermissions(ctx context.
 	var authorizer refreshable.Authorizer
 	var client authorization.PermissionsClient
 	var code string
-	if strings.Contains(typ, "service pricipal") {
+	if strings.Contains(typ, "service principal") {
 		authorizer = dv.spAuthorizer
 		client = dv.spPermissions
 		code = api.CloudErrorCodeInvalidServicePrincipalPermissions
