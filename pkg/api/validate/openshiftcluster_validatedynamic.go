@@ -38,7 +38,7 @@ type OpenShiftClusterDynamicValidator interface {
 	Setup(context.Context) error
 	ValidateServicePrincipalProfile(context.Context) (refreshable.Authorizer, error)
 	ValidateVnetPermissions(context.Context, string, *azure.Resource, string) error
-	ValidateRouteTablePermissions(context.Context, *mgmtnetwork.VirtualNetwork, string) error
+	ValidateRouteTablePermissions(context.Context, *azure.Resource, string) error
 }
 
 // NewOpenShiftClusterDynamicValidator creates a new OpenShiftClusterDynamicValidator
@@ -132,23 +132,17 @@ func (dv *openShiftClusterDynamicValidator) Dynamic(ctx context.Context) error {
 		return err
 	}
 
-	// Get after validating permissions
-	vnet, err := dv.spVirtualNetworks.Get(ctx, vnetr.ResourceGroup, vnetr.ResourceName, "")
+	err = dv.ValidateRouteTablePermissions(ctx, &vnetr, "provided service principal")
 	if err != nil {
 		return err
 	}
 
-	err = dv.ValidateRouteTablePermissions(ctx, &vnet, "provided service principal")
+	err = dv.ValidateRouteTablePermissions(ctx, &vnetr, "resource provider")
 	if err != nil {
 		return err
 	}
 
-	err = dv.ValidateRouteTablePermissions(ctx, &vnet, "resource provider")
-	if err != nil {
-		return err
-	}
-
-	err = dv.ValidateVnet(ctx, &vnet)
+	err = dv.ValidateVnet(ctx, &vnetr)
 	if err != nil {
 		return err
 	}
@@ -226,11 +220,16 @@ func (dv *openShiftClusterDynamicValidator) ValidateVnetPermissions(ctx context.
 	return err
 }
 
-func (dv *openShiftClusterDynamicValidator) ValidateRouteTablePermissions(ctx context.Context, vnet *mgmtnetwork.VirtualNetwork, typ string) error {
+func (dv *openShiftClusterDynamicValidator) ValidateRouteTablePermissions(ctx context.Context, vnetr *azure.Resource, typ string) error {
+	vnet, err := dv.spVirtualNetworks.Get(ctx, vnetr.ResourceGroup, vnetr.ResourceName, "")
+	if err != nil {
+		return err
+	}
+
 	var authorizer refreshable.Authorizer
 	var client authorization.PermissionsClient
 	var code string
-	if strings.Contains(typ, "service pricipal") {
+	if strings.Contains(typ, "service principal") {
 		authorizer = dv.spAuthorizer
 		client = dv.spPermissions
 		code = api.CloudErrorCodeInvalidServicePrincipalPermissions
@@ -240,12 +239,12 @@ func (dv *openShiftClusterDynamicValidator) ValidateRouteTablePermissions(ctx co
 		code = api.CloudErrorCodeInvalidResourceProviderPermissions
 	}
 
-	err := dv.validateRouteTablePermissionsSubnet(ctx, authorizer, client, vnet, dv.oc.Properties.MasterProfile.SubnetID, "properties.masterProfile.subnetId", code, typ)
+	err = dv.validateRouteTablePermissionsSubnet(ctx, authorizer, client, &vnet, dv.oc.Properties.MasterProfile.SubnetID, "properties.masterProfile.subnetId", code, typ)
 	if err != nil {
 		return err
 	}
 
-	return dv.validateRouteTablePermissionsSubnet(ctx, authorizer, client, vnet, dv.oc.Properties.WorkerProfiles[0].SubnetID, `properties.workerProfiles["worker"].subnetId`, code, typ)
+	return dv.validateRouteTablePermissionsSubnet(ctx, authorizer, client, &vnet, dv.oc.Properties.WorkerProfiles[0].SubnetID, `properties.workerProfiles["worker"].subnetId`, code, typ)
 }
 
 func (dv *openShiftClusterDynamicValidator) validateRouteTablePermissionsSubnet(ctx context.Context, authorizer refreshable.Authorizer, client authorization.PermissionsClient, vnet *mgmtnetwork.VirtualNetwork, subnetID, path, code, typ string) error {
@@ -357,15 +356,20 @@ func (dv *openShiftClusterDynamicValidator) validateSubnet(ctx context.Context, 
 }
 
 // validateVnet checks that the vnet does not have custom dns servers set
-func (dv *openShiftClusterDynamicValidator) ValidateVnet(ctx context.Context, vnet *mgmtnetwork.VirtualNetwork) error {
+func (dv *openShiftClusterDynamicValidator) ValidateVnet(ctx context.Context, vnetr *azure.Resource) error {
 	dv.log.Print("validateVnet")
 
-	master, err := dv.validateSubnet(ctx, vnet, "properties.masterProfile.subnetId", dv.oc.Properties.MasterProfile.SubnetID)
+	vnet, err := dv.spVirtualNetworks.Get(ctx, vnetr.ResourceGroup, vnetr.ResourceName, "")
 	if err != nil {
 		return err
 	}
 
-	worker, err := dv.validateSubnet(ctx, vnet, `properties.workerProfiles["worker"].subnetId`, dv.oc.Properties.WorkerProfiles[0].SubnetID)
+	master, err := dv.validateSubnet(ctx, &vnet, "properties.masterProfile.subnetId", dv.oc.Properties.MasterProfile.SubnetID)
+	if err != nil {
+		return err
+	}
+
+	worker, err := dv.validateSubnet(ctx, &vnet, `properties.workerProfiles["worker"].subnetId`, dv.oc.Properties.WorkerProfiles[0].SubnetID)
 	if err != nil {
 		return err
 	}
