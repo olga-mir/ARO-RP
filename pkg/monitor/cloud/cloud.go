@@ -101,17 +101,16 @@ func (mon *Monitor) rpValidateVnetPermissions(ctx context.Context) error {
 }
 
 func (mon *Monitor) spValidateRouteTablePermissions(ctx context.Context) error {
-	return nil
-	// vnet, err := mon.dv.spVirtualNetworks.Get(ctx, vnetr.ResourceGroup, vnetr.ResourceName, "")
-	// if err != nil {
-	// 	return err
-	// }
-	// return mon.dv.ValidateRouteTablePermissions(ctx, &vnet, "service principal")
+	return mon.dv.ValidateRouteTablePermissions(ctx, &mon.vnetr, "service principal")
 }
 
-//        err = dv.ValidateRouteTablePermissions(ctx, dv.fpAuthorizer, dv.fpPermissions, &vnet, api.CloudErrorCodeInvalidResourceProviderPermissions, "resource provider")
-//        err = dv.ValidateVnet(ctx, &vnet)
-//        err = dv.ValidateProviders(ctx)
+func (mon *Monitor) rpValidateRouteTablePermissions(ctx context.Context) error {
+	return mon.dv.ValidateRouteTablePermissions(ctx, &mon.vnetr, "resource provider")
+}
+
+func (mon *Monitor) validateVnet(ctx context.Context) error {
+	return mon.dv.ValidateVnet(ctx, &mon.vnetr)
+}
 
 // Monitor checks various misconfigurations in cloud infrastructure
 func (mon *Monitor) Monitor(ctx context.Context) {
@@ -124,6 +123,8 @@ func (mon *Monitor) Monitor(ctx context.Context) {
 		mon.spValidateVnetPermissions,
 		mon.rpValidateVnetPermissions,
 		mon.spValidateRouteTablePermissions,
+		mon.rpValidateRouteTablePermissions,
+		mon.validateVnet,
 	} {
 		mon.reportError(f(ctx))
 	}

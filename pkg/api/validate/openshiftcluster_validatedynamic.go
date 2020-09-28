@@ -39,6 +39,7 @@ type OpenShiftClusterDynamicValidator interface {
 	ValidateServicePrincipalProfile(context.Context) (refreshable.Authorizer, error)
 	ValidateVnetPermissions(context.Context, string, *azure.Resource, string) error
 	ValidateRouteTablePermissions(context.Context, *azure.Resource, string) error
+	ValidateVnet(context.Context, *azure.Resource) error
 }
 
 // NewOpenShiftClusterDynamicValidator creates a new OpenShiftClusterDynamicValidator
@@ -147,7 +148,7 @@ func (dv *openShiftClusterDynamicValidator) Dynamic(ctx context.Context) error {
 		return err
 	}
 
-	err = dv.ValidateProviders(ctx)
+	err = dv.validateProviders(ctx)
 	if err != nil {
 		return err
 	}
@@ -398,7 +399,7 @@ func (dv *openShiftClusterDynamicValidator) ValidateVnet(ctx context.Context, vn
 	return nil
 }
 
-func (dv *openShiftClusterDynamicValidator) ValidateProviders(ctx context.Context) error {
+func (dv *openShiftClusterDynamicValidator) validateProviders(ctx context.Context) error {
 	dv.log.Print("validateProviders")
 
 	providers, err := dv.spProviders.List(ctx, nil, "")
