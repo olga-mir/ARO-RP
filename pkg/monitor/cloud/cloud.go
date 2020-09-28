@@ -24,6 +24,8 @@ type Monitor struct {
 	oc       *api.OpenShiftCluster
 	dims     map[string]string
 	resource azure.Resource
+	vnetID   string
+	vnetr    azure.Resource
 
 	m  metrics.Interface
 	dv validate.OpenShiftClusterDynamicValidator
@@ -48,6 +50,16 @@ func NewMonitor(ctx context.Context, env env.Interface, log *logrus.Entry, oc *a
 		return nil, err
 	}
 
+	vnetID, _, err := subnet.Split(oc.Properties.MasterProfile.SubnetID)
+	if err != nil {
+		return nil, err
+	}
+
+	vnetr, err := azure.ParseResourceID(vnetID)
+	if err != nil {
+		return nil, err
+	}
+
 	dims := map[string]string{
 		"resourceId":     oc.ID,
 		"subscriptionId": r.SubscriptionID,
@@ -63,6 +75,8 @@ func NewMonitor(ctx context.Context, env env.Interface, log *logrus.Entry, oc *a
 		oc:       oc,
 		dims:     dims,
 		resource: r,
+		vnetID:   vnetID,
+		vnetr:    vnetr,
 
 		m:  m,
 		dv: dv,
@@ -79,37 +93,16 @@ var errorMap = map[string]string{
 }
 
 func (mon *Monitor) spValidateVnetPermissions(ctx context.Context) error {
-	// TODO - vnetID and vnetr to setup as properties to avoid duplication
-	vnetID, _, err := subnet.Split(mon.oc.Properties.MasterProfile.SubnetID)
-	if err != nil {
-		return err
-	}
-
-	vnetr, err := azure.ParseResourceID(vnetID)
-	if err != nil {
-		return err
-	}
-
-	return mon.dv.ValidateVnetPermissions(ctx, vnetID, &vnetr, "service principal")
+	return mon.dv.ValidateVnetPermissions(ctx, mon.vnetID, &mon.vnetr, "service principal")
 }
 
 func (mon *Monitor) rpValidateVnetPermissions(ctx context.Context) error {
-	vnetID, _, err := subnet.Split(mon.oc.Properties.MasterProfile.SubnetID)
-	if err != nil {
-		return err
-	}
-
-	vnetr, err := azure.ParseResourceID(vnetID)
-	if err != nil {
-		return err
-	}
-
-	return mon.dv.ValidateVnetPermissions(ctx, vnetID, &vnetr, "resource provider")
+	return mon.dv.ValidateVnetPermissions(ctx, mon.vnetID, &mon.vnetr, "resource provider")
 }
 
 func (mon *Monitor) spValidateRouteTablePermissions(ctx context.Context) error {
 	return nil
-	// vnet, err := dv.spVirtualNetworks.Get(ctx, vnetr.ResourceGroup, vnetr.ResourceName, "")
+	// vnet, err := mon.dv.spVirtualNetworks.Get(ctx, vnetr.ResourceGroup, vnetr.ResourceName, "")
 	// if err != nil {
 	// 	return err
 	// }
@@ -126,7 +119,6 @@ func (mon *Monitor) Monitor(ctx context.Context) {
 
 	err := mon.dv.Setup(ctx)
 	mon.reportError(err)
-	// probably we need to split checks in rp and sp series. Abort the line if the permissions are missing?
 
 	for _, f := range []func(context.Context) error{
 		mon.spValidateVnetPermissions,
