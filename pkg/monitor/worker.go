@@ -200,11 +200,12 @@ func (mon *monitor) workOne(ctx context.Context, log *logrus.Entry, doc *api.Ope
 
 	c.Monitor(ctx)
 
+	log.Warnf("GGG start cloud monitor worker")
 	cm, err := cloud.NewMonitor(ctx, mon.env, log, doc.OpenShiftCluster, subscriptionDoc, mon.clusterm, hourlyRun)
 	if err != nil {
 		log.Error(err)
 		return
 	}
-	cm.Monitor(ctx) // should be ok to run in parallel with cluster mon.
+	cm.Monitor(ctx)
 
 }

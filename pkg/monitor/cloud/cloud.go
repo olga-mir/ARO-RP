@@ -29,14 +29,6 @@ type Monitor struct {
 
 	m  metrics.Interface
 	dv validate.OpenShiftClusterDynamicValidator
-
-	// spAuthorizer refreshable.Authorizer
-	// fpAuthorizer refreshable.Authorizer
-	// fpPermissions     authorization.PermissionsClient
-	// spPermissions     authorization.PermissionsClient
-	// spProviders       features.ProvidersClient
-	// spUsage           compute.UsageClient
-	// spVirtualNetworks network.VirtualNetworksClient
 }
 
 // NewMonitor creates new Monitor
@@ -115,6 +107,7 @@ func (mon *Monitor) validateVnet(ctx context.Context) error {
 // Monitor checks various misconfigurations in cloud infrastructure
 func (mon *Monitor) Monitor(ctx context.Context) {
 	mon.log.Debug("monitoring")
+	mon.log.Warnf("GGG Running cloud monitor GGG")
 
 	err := mon.dv.Setup(ctx)
 	mon.reportError(err)

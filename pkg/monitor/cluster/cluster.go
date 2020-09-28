@@ -111,6 +111,7 @@ func NewMonitor(ctx context.Context, env env.Interface, log *logrus.Entry, oc *a
 // Monitor checks the API server health of a cluster
 func (mon *Monitor) Monitor(ctx context.Context) {
 	mon.log.Debug("monitoring")
+	mon.log.Warnf("GGG Running CLUSTER monitor GGG")
 
 	// If API is not returning 200, don't need to run the next checks
 	statusCode, err := mon.emitAPIServerHealthzCode()
