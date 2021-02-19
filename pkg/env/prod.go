@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
@@ -20,6 +21,7 @@ import (
 	"github.com/Azure/ARO-RP/pkg/proxy"
 	"github.com/Azure/ARO-RP/pkg/util/azureclient/mgmt/compute"
 	"github.com/Azure/ARO-RP/pkg/util/clientauthorizer"
+	"github.com/Azure/ARO-RP/pkg/util/credentialsmanager"
 	"github.com/Azure/ARO-RP/pkg/util/keyvault"
 	"github.com/Azure/ARO-RP/pkg/util/refreshable"
 	"github.com/Azure/ARO-RP/pkg/util/version"
@@ -35,9 +37,7 @@ type prod struct {
 	acrDomain string
 	zones     map[string][]string
 
-	fpCertificate *x509.Certificate
-	fpPrivateKey  *rsa.PrivateKey
-	fpClientID    string
+	fpClientID string
 
 	clusterKeyvault keyvault.Manager
 	serviceKeyvault keyvault.Manager
@@ -48,6 +48,8 @@ type prod struct {
 	clusterGenevaLoggingEnvironment   string
 
 	log *logrus.Entry
+
+	fpCredentialsManager credentialsmanager.Manager
 }
 
 func newProd(ctx context.Context, log *logrus.Entry) (*prod, error) {
@@ -107,13 +109,11 @@ func newProd(ctx context.Context, log *logrus.Entry) (*prod, error) {
 		return nil, err
 	}
 
-	fpPrivateKey, fpCertificates, err := p.serviceKeyvault.GetCertificateSecret(ctx, RPFirstPartySecretName)
+	p.fpCredentialsManager, err = credentialsmanager.NewManager(p.serviceKeyvault, RPFirstPartySecretName, time.Duration(12)*time.Hour, time.Duration(24)*time.Hour)
 	if err != nil {
 		return nil, err
 	}
 
-	p.fpPrivateKey = fpPrivateKey
-	p.fpCertificate = fpCertificates[0]
 	p.fpClientID = "f1dd0a37-89c6-4e07-bcd1-ffd3d43d8875"
 
 	clusterGenevaLoggingPrivateKey, clusterGenevaLoggingCertificates, err := p.serviceKeyvault.GetCertificateSecret(ctx, ClusterLoggingSecretName)
@@ -225,7 +225,12 @@ func (p *prod) FPAuthorizer(tenantID, resource string) (refreshable.Authorizer, 
 		return nil, err
 	}
 
-	sp, err := adal.NewServicePrincipalTokenFromCertificate(*oauthConfig, p.fpClientID, p.fpCertificate, p.fpPrivateKey, resource)
+	fpCertificate, fpPrivateKey, err := p.fpCredentialsManager.Get()
+	if err != nil {
+		return nil, err
+	}
+
+	sp, err := adal.NewServicePrincipalTokenFromCertificate(*oauthConfig, p.fpClientID, fpCertificate, fpPrivateKey, resource)
 	if err != nil {
 		return nil, err
 	}

@@ -118,7 +118,12 @@ func (d *dev) FPAuthorizer(tenantID, resource string) (refreshable.Authorizer, e
 		return nil, err
 	}
 
-	sp, err := adal.NewServicePrincipalTokenFromCertificate(*oauthConfig, os.Getenv("AZURE_FP_CLIENT_ID"), d.fpCertificate, d.fpPrivateKey, resource)
+	fpCertificate, fpPrivateKey, err := d.fpCredentialsManager.Get()
+	if err != nil {
+		return nil, err
+	}
+
+	sp, err := adal.NewServicePrincipalTokenFromCertificate(*oauthConfig, os.Getenv("AZURE_FP_CLIENT_ID"), fpCertificate, fpPrivateKey, resource)
 	if err != nil {
 		return nil, err
 	}
